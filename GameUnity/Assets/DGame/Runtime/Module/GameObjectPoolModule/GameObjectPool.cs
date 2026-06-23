@@ -16,6 +16,8 @@ namespace DGame
     {
         private Queue<GameObject> m_goPool;
         private readonly DGameLinkedList<GameObject> m_spawnedPool = new DGameLinkedList<GameObject>();
+        private readonly Dictionary<GameObject, LinkedListNode<GameObject>> m_spawnedNodeDict =
+            new Dictionary<GameObject, LinkedListNode<GameObject>>();
         private GameObject m_parent;
         private int m_initCapacity;
         private int m_maxCapacity;
@@ -177,6 +179,7 @@ namespace DGame
                 {
                     go = m_spawnedPool.First.Value;
                     m_spawnedPool.RemoveFirst();
+                    m_spawnedNodeDict.Remove(go);
                     DLogger.Warning($"强制复用正在使用的对象: {go.name}");
                 }
                 else
@@ -208,7 +211,7 @@ namespace DGame
             }
             go.transform.SetLocalPositionAndRotation(position, rotation);
             go.SetActive(true);
-            m_spawnedPool.AddLast(go);
+            m_spawnedNodeDict[go] = m_spawnedPool.AddLast(go);
             return go;
         }
 
@@ -228,11 +231,14 @@ namespace DGame
                 DestroyGameObject(go);
                 return;
             }
-            if (!m_spawnedPool.Remove(go))
+            
+            if (!m_spawnedNodeDict.Remove(go, out var node))
             {
                 DLogger.Warning($"对象不在已生成列表中，可能已回收: {go.name}");
                 return;
             }
+            
+            m_spawnedPool.Remove(node);
 
             if (!MarkedForDestroy && Count < m_maxCapacity)
             {
@@ -265,12 +271,13 @@ namespace DGame
                 return;
             }
 
-            if (!m_spawnedPool.Remove(go))
+            if (!m_spawnedNodeDict.Remove(go, out var node))
             {
                 DLogger.Warning($"对象不在已生成列表中，可能已丢弃或回收: {go.name}");
                 return;
             }
-
+            
+            m_spawnedPool.Remove(node);
             MarkIdleTimeIfNeeded();
             DestroyGameObject(go);
         }
@@ -459,6 +466,7 @@ namespace DGame
             if (m_goPool == null)
             {
                 m_spawnedPool.Clear();
+                m_spawnedNodeDict.Clear();
                 return;
             }
 
@@ -480,15 +488,11 @@ namespace DGame
             m_goPool.Clear();
             m_goPool = null;
             m_spawnedPool.Clear();
+            m_spawnedNodeDict.Clear();
         }
 
         private void MarkPooledObject(GameObject go)
         {
-            if (go == null)
-            {
-                return;
-            }
-
             var identity = DGame.Utility.UnityUtil.AddMonoBehaviour<GameObjectPoolIdentity>(go);
             identity.PoolKey = Location;
         }
