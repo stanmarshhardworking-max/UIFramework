@@ -311,6 +311,66 @@ namespace DGame
             return false;
         }
 
+        internal void FillDebugInfo(GameObjectPoolDebugInfo info)
+        {
+            if (info == null)
+            {
+                return;
+            }
+
+            info.Location = Location;
+            info.Count = Count;
+            info.SpawnedCount = SpawnedCount;
+            info.NoSpawnCount = NoSpawnCount;
+            info.MaxCapacity = m_maxCapacity;
+            info.AutoDestroyTime = m_autoDestroyTime;
+            info.IdleTime = m_lastRecycleTime > 0f && SpawnedCount <= 0
+                ? Time.realtimeSinceStartup - m_lastRecycleTime
+                : 0f;
+            info.DontDestroy = DontDestroy;
+            info.MarkedForDestroy = MarkedForDestroy;
+            info.IsDestroyed = IsDestroyed;
+            info.CanAutoDestroy = CanAutoDestroy();
+            info.Objects.Clear();
+
+            if (m_goPool != null)
+            {
+                foreach (var go in m_goPool)
+                {
+                    AddObjectDebugInfo(info.Objects, go, false);
+                }
+            }
+
+            foreach (var go in m_spawnedPool)
+            {
+                AddObjectDebugInfo(info.Objects, go, true);
+            }
+        }
+
+        private static void AddObjectDebugInfo(List<GameObjectPoolObjectDebugInfo> results, GameObject go, bool spawned)
+        {
+            if (go == null)
+            {
+                return;
+            }
+
+            var objectInfo = new GameObjectPoolObjectDebugInfo
+            {
+                Name = go.name,
+                Spawned = spawned,
+                ActiveSelf = go.activeSelf,
+                Parent = go.transform.parent,
+                GameObject = go,
+            };
+
+            if (go.TryGetComponent<GameObjectPoolIdentity>(out var identity))
+            {
+                objectInfo.PoolKey = identity.PoolKey;
+            }
+
+            results.Add(objectInfo);
+        }
+
         /// <summary>
         /// 销毁对象池
         /// </summary>
